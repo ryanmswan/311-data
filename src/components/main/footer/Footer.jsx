@@ -3,56 +3,62 @@ import { connect } from 'react-redux';
 import { Switch, Route } from 'react-router-dom';
 import propTypes from 'proptypes';
 import moment from 'moment';
+import HoverOverInfo from '@components/common/HoverOverInfo';
 import StaticFooter from './StaticFooter';
-
-import COLORS from '../../../styles/COLORS';
-
-const footerTextStyle = {
-  color: COLORS.BACKGROUND,
-  fontWeight: 'bold',
-};
 
 const Footer = ({
   lastUpdated,
-}) => (
-  <footer
-    className="navbar has-navbar-fixed-bottom"
-    style={{
-      position: 'fixed',
-      bottom: '0',
-      height: '45px',
-      background: '#002449',
-      // Really high z-index here to ensure Footer is on top of modal
-      zIndex: '20000',
-    }}
-  >
-    <div className="level" style={{ width: '100vw' }}>
+  version,
+  backendSha,
+}) => {
+  const frontendSha = process.env.GITHUB_SHA || 'DEVELOPMENT';
+  return (
+    <footer className="navbar has-navbar-fixed-bottom">
       <Switch>
         <Route path="/(about|contact)" component={StaticFooter} />
         <Route path="/">
-          <div className="level-item">
-            <p style={footerTextStyle}>
-              Data Updated Through:
-              &nbsp;
-              {lastUpdated && moment(1000 * lastUpdated).format('MMMM Do YYYY, h:mm:ss a')}
-            </p>
-          </div>
+          <span className="last-updated">
+            Data Updated Through:
+            &nbsp;
+            {lastUpdated && moment(1000 * lastUpdated).format('MMMM Do YYYY, h:mm:ss a')}
+          </span>
+          { version && backendSha && (
+            <span className="version">
+              <HoverOverInfo
+                position="top"
+                text={[
+                  frontendSha.substr(0, 7),
+                  backendSha.substr(0, 7),
+                ]}
+              >
+                Version
+                &nbsp;
+                { version }
+              </HoverOverInfo>
+            </span>
+          )}
         </Route>
       </Switch>
-    </div>
-  </footer>
-);
+    </footer>
+  );
+};
 
 const mapStateToProps = state => ({
   lastUpdated: state.data.lastUpdated,
+  version: state.metadata.version,
+  backendSha: state.metadata.gitSha,
 });
 
 Footer.propTypes = {
   lastUpdated: propTypes.number,
+  version: propTypes.string,
+  backendSha: propTypes.string,
 };
 
 Footer.defaultProps = {
   lastUpdated: undefined,
+  version: undefined,
+  backendSha: undefined,
 };
 
 export default connect(mapStateToProps, null)(Footer);

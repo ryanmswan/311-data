@@ -13,9 +13,10 @@ from services.frequencyService import FrequencyService
 from services.pinService import PinService
 from services.requestCountsService import RequestCountsService
 from services.requestDetailService import RequestDetailService
-from services.ingress_service import ingress_service
 from services.sqlIngest import DataHandler
 from services.feedbackService import FeedbackService
+
+from utils.sanic import add_performance_header
 
 app = Sanic(__name__)
 CORS(app)
@@ -23,21 +24,12 @@ compress = Compress()
 
 
 def environment_overrides():
-    if os.environ.get('DB_CONNECTION_STRING', None):
-        app.config['Settings']['Database']['DB_CONNECTION_STRING'] =\
-            os.environ.get('DB_CONNECTION_STRING')
-    if os.environ.get('PORT', None):
-        app.config['Settings']['Server']['PORT'] =\
-            os.environ.get('PORT')
-    if os.environ.get('TOKEN', None):
-        app.config['Settings']['Socrata']['TOKEN'] =\
-            os.environ.get('TOKEN')
-    if os.environ.get('GITHUB_TOKEN', None):
-        app.config['Settings']['Github']['GITHUB_TOKEN'] =\
-            os.environ.get('GITHUB_TOKEN')
-    if os.environ.get('PROJECT_URL', None):
-        app.config['Settings']['Github']['PROJECT_URL'] =\
-            os.environ.get('PROJECT_URL')
+    settings = app.config['Settings']
+    for section in settings:
+        for key in settings[section]:
+            envKey = key.upper()
+            if os.environ.get(envKey, None):
+                settings[section][envKey] = os.environ.get(envKey)
 
 
 def configure_app():
@@ -49,6 +41,24 @@ def configure_app():
     environment_overrides()
     app.config["STATIC_DIR"] = os.path.join(os.getcwd(), "static")
     os.makedirs(os.path.join(app.config["STATIC_DIR"], "temp"), exist_ok=True)
+    if app.config['Settings']['Server']['Debug']:
+        add_performance_header(app)
+
+
+@app.route('/apistatus')
+@compress.compress()
+async def healthcheck(request):
+    currentTime = datetime.utcnow()
+    settings = app.config['Settings']
+    githubSha = settings['Github']['GITHUB_SHA']
+    semVersion = '{}.{}.{}'.format(
+        settings['Version']['VER_MAJOR'],
+        settings['Version']['VER_MINOR'],
+        settings['Version']['VER_PATCH'])
+
+    return json({'currentTime': currentTime,
+                 'gitSha': githubSha,
+                 'version': semVersion})
 
 
 @app.route('/')
@@ -75,30 +85,62 @@ async def timetoclose(request):
     return json(data)
 
 
+@app.route('/timetoclose-comparison', methods=["POST"])
+@compress.compress()
+async def timetoclose_comparison(request):
+    ttc_worker = TimeToCloseService(app.config['Settings'])
+
+    postArgs = request.json
+    startDate = postArgs.get('startDate', None)
+    endDate = postArgs.get('endDate', None)
+    requestTypes = postArgs.get('requestTypes', [])
+    set1 = postArgs.get('set1', None)
+    set2 = postArgs.get('set2', None)
+
+    data = await ttc_worker.get_ttc_comparison(startDate=startDate,
+                                               endDate=endDate,
+                                               requestTypes=requestTypes,
+                                               set1=set1,
+                                               set2=set2)
+    return json(data)
+
+
 @app.route('/requestfrequency', methods=["POST"])
 @compress.compress()
 async def requestfrequency(request):
     freq_worker = FrequencyService(app.config['Settings'])
 
     postArgs = request.json
-    start = postArgs.get('startDate', None)
-    end = postArgs.get('endDate', None)
-    ncs = postArgs.get('ncList', [])
-    requests = postArgs.get('requestTypes', [])
+    startDate = postArgs.get('startDate', None)
+    endDate = postArgs.get('endDate', None)
+    ncList = postArgs.get('ncList', [])
+    requestTypes = postArgs.get('requestTypes', [])
 
-    data = await freq_worker.get_frequency(startDate=start,
-                                           endDate=end,
-                                           ncList=ncs,
-                                           requestTypes=requests)
+    data = await freq_worker.get_frequency(startDate=startDate,
+                                           endDate=endDate,
+                                           ncList=ncList,
+                                           requestTypes=requestTypes)
     return json(data)
 
 
-@app.route('/sample-data')
+@app.route('/requestfrequency-comparison', methods=["POST"])
 @compress.compress()
-async def sample_route(request):
-    sample_dataset = {'cool_key': ['value1', 'value2'],
-                      app.config['REDACTED']: app.config['REDACTED']}
-    return json(sample_dataset)
+async def requestfrequency_comparison(request):
+    worker = FrequencyService(app.config['Settings'])
+
+    postArgs = request.json
+    startDate = postArgs.get('startDate', None)
+    endDate = postArgs.get('endDate', None)
+    requestTypes = postArgs.get('requestTypes', [])
+    set1 = postArgs.get('set1', None)
+    set2 = postArgs.get('set2', None)
+
+    data = await worker.get_frequency_comparison(startDate=startDate,
+                                                 endDate=endDate,
+                                                 requestTypes=requestTypes,
+                                                 set1=set1,
+                                                 set2=set2)
+    return json(data)
 
 
 @app.route('/ingest', methods=["GET"])
@@ -158,22 +200,6 @@ async def ingest(request):
     return json(data)
 
 
-@app.route('/update')
-@compress.compress()
-async def update(request):
-    ingress_worker = ingress_service()
-    return_data = ingress_worker.update()
-    return json(return_data)
-
-
-@app.route('/delete')
-@compress.compress()
-async def delete(request):
-    ingress_worker = ingress_service()
-    return_data = ingress_worker.delete()
-    return json(return_data)
-
-
 @app.route('/pins', methods=["POST"])
 @compress.compress()
 async def pinMap(request):
@@ -208,6 +234,28 @@ async def requestCounts(request):
                                                      requestTypes=requests,
                                                      countFields=countFields)
     return json(return_data)
+
+
+@app.route('/requestcounts-comparison', methods=["POST"])
+@compress.compress()
+async def requestCountsComparison(request):
+    worker = RequestCountsService(app.config['Settings'])
+
+    postArgs = request.json
+    startDate = postArgs.get('startDate', None)
+    endDate = postArgs.get('endDate', None)
+    requestTypes = postArgs.get('requestTypes', [])
+    set1 = postArgs.get('set1', None)
+    set2 = postArgs.get('set2', None)
+    countFields = postArgs.get('countFields', [])
+
+    data = await worker.get_req_counts_comparison(startDate=startDate,
+                                                  endDate=endDate,
+                                                  requestTypes=requestTypes,
+                                                  set1=set1,
+                                                  set2=set2,
+                                                  countFields=countFields)
+    return json(data)
 
 
 @app.route('/servicerequest/<srnumber>', methods=["GET"])

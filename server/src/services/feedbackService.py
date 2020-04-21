@@ -12,11 +12,17 @@ class FeedbackService(object):
         self.project_url = None if not self.config \
             else self.config['Github']['PROJECT_URL']
 
-    async def create_issue(self, title, body, labels=['feedback'], milestone=None, assignees=[]):
+    async def create_issue(self,
+                           title,
+                           body,
+                           labels=['feedback'],
+                           milestone=None,
+                           assignees=[]):
         """
         Creates a Github issue via Github API v3 and returns the new issue id.
 
-        Note: Per Github, the API (and required 'Accept' headers) may change without notice.
+        Note: Per Github, the API (and required 'Accept' headers) may change
+        without notice.
         See https://developer.github.com/v3/issues/
         """
         headers = {
@@ -34,26 +40,29 @@ class FeedbackService(object):
 
         async with requests.Session() as session:
             try:
-                response = await session.post(self.issues_url, data=payload, headers=headers)
+                response = await session.post(self.issues_url,
+                                              data=payload,
+                                              headers=headers)
+                response.raise_for_status()
                 response_content = loads(response.content)
                 issue_id = response_content['id']
-                response.raise_for_status()
                 return issue_id
             except requests.exceptions.HTTPError as errh:
-                return "An Http Error occurred:" + repr(errh)
+                return errh
             except requests.exceptions.ConnectionError as errc:
-                return "An Error Connecting to the API occurred:" + repr(errc)
+                return errc
             except requests.exceptions.Timeout as errt:
-                return "A Timeout Error occurred:" + repr(errt)
+                return errt
             except requests.exceptions.RequestException as err:
-                return "An Unknown Error occurred" + repr(err)
+                return err
 
     async def add_issue_to_project(self, issue_id, content_type='Issue'):
         """
         Takes a Github issue id and adds the issue to a project board card.
         Returns the response from Github API.
 
-        Note: Per Github, the API (and required 'Accept' headers) may change without notice.
+        Note: Per Github, the API (and required 'Accept' headers) may change
+        without notice.
         See https://developer.github.com/v3/projects/cards/
         """
         headers = {
@@ -68,14 +77,16 @@ class FeedbackService(object):
 
         async with requests.Session() as session:
             try:
-                response = await session.post(self.project_url, data=payload, headers=headers)
+                response = await session.post(self.project_url,
+                                              data=payload,
+                                              headers=headers)
                 response.raise_for_status()
                 return response.status_code
             except requests.exceptions.HTTPError as errh:
-                return "An Http Error occurred:" + repr(errh)
+                return errh
             except requests.exceptions.ConnectionError as errc:
-                return "An Error Connecting to the API occurred:" + repr(errc)
+                return errc
             except requests.exceptions.Timeout as errt:
-                return "A Timeout Error occurred:" + repr(errt)
+                return errt
             except requests.exceptions.RequestException as err:
-                return "An Unknown Error occurred" + repr(err)
+                return err

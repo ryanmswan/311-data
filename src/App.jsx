@@ -1,32 +1,40 @@
 import React, { useEffect } from 'react';
+import PropTypes from 'proptypes';
 import { connect } from 'react-redux';
-import { BrowserRouter as Router } from 'react-router-dom';
+import { HashRouter as Router } from 'react-router-dom';
+
+import { getMetadataRequest } from '@reducers/metadata';
 
 import Routes from './Routes';
 import Header from './components/main/header/Header';
 import Footer from './components/main/footer/Footer';
-import Tooltip from './components/main/tooltip/Tooltip';
-import SnapshotService, { SnapshotRenderer } from './components/export/SnapshotService';
-import Visualizations from './components/Visualizations';
+import { SnapshotRenderer } from './components/export/SnapshotService';
 
-SnapshotService.register({ Visualizations });
+const basename = process.env.NODE_ENV === 'development' ? '/' : process.env.BASE_URL || '/';
 
-const App = () => {
+const App = ({
+  getMetadata,
+}) => {
   useEffect(() => {
-    // fetch data on load??
-  }, []);
+    getMetadata();
+  });
 
   return (
-    <Router
-      basename={process.env.BASE_URL || '/'}
-    >
+    <Router basename={basename}>
       <Header />
       <Routes />
       <Footer />
-      <Tooltip />
       <SnapshotRenderer />
     </Router>
   );
 };
 
-export default connect(null, null)(App);
+const mapDispatchToProps = dispatch => ({
+  getMetadata: () => dispatch(getMetadataRequest()),
+});
+
+export default connect(null, mapDispatchToProps)(App);
+
+App.propTypes = {
+  getMetadata: PropTypes.func.isRequired,
+};
