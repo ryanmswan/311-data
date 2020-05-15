@@ -12,6 +12,7 @@ services:
      PROJECT_URL: REDACTED
      GITHUB_TOKEN: REDACTED
      TOKEN: REDACTED
+     REDIS_URL: redis://redis:6379
    ports:
      - 5000:5000
 
@@ -25,7 +26,6 @@ services:
    environment:
      REACT_APP_MAPBOX_TOKEN: REDACTED
      DB_URL: http://localhost:5000
-     BASE_URL: ''
    ports:
      - 3000:3000
 
@@ -47,5 +47,21 @@ services:
     container_name: "postgres-dashboard"
     ports:
       - 8080:8080
+
+  redis:
+    build:
+      context: ../redis
+    container_name: "311-redis"
+    expose:
+      - 6379
+
+  rebrow:
+    image: marian/rebrow
+    links:
+      - redis:redis
+    container_name: "redis-dashboard"
+    ports:
+      - 5001:5001
+
 volumes:
   backend_data:

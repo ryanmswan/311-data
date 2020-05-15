@@ -2,8 +2,8 @@ from .dataService import DataService
 
 
 class PinService(object):
-    def __init__(self, config=None, tableName="ingest_staging_table"):
-        self.dataAccess = DataService(config, tableName)
+    def __init__(self, config=None):
+        self.dataAccess = DataService()
 
     async def get_base_pins(self,
                             startDate=None,
@@ -13,7 +13,6 @@ class PinService(object):
         """
         Returns the base pin data given times, ncs, and request filters
         {
-          'LastPulled': 'Timestamp',
           'data': [
             {
               'srnumber':'String',

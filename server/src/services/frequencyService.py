@@ -5,8 +5,8 @@ from .dataService import DataService
 
 
 class FrequencyService(object):
-    def __init__(self, config=None, tableName="ingest_staging_table"):
-        self.dataAccess = DataService(config, tableName)
+    def __init__(self, config=None):
+        self.dataAccess = DataService()
 
     def get_bins(self, startDate, endDate):
         """
@@ -47,12 +47,9 @@ class FrequencyService(object):
             counts, _ = np.histogram(dates, bins=bins)
             return list(map(int, counts))
 
-        # grab the necessary data from the db
+        # grab the necessary data from the db and drop nulls
         fields = [groupField, 'createddate']
-        data = self.dataAccess.query(fields, filters)
-
-        # read into a dataframe and drop the nulls
-        df = pd.DataFrame(data['data'], columns=fields).dropna()
+        df = self.dataAccess.query(fields, filters, table='vis').dropna()
 
         # convert bins to float so numpy can use them
         bins_fl = np.array(bins).astype('datetime64[s]').astype('float')
@@ -69,12 +66,10 @@ class FrequencyService(object):
             if item not in counts.keys():
                 counts[item] = [0 for bin in bins][:-1]
 
-        data['data'] = {
+        return {
             'bins': list(bins.astype(str)),
             'counts': counts
         }
-
-        return data
 
     async def get_frequency(self,
                             startDate=None,
@@ -156,16 +151,13 @@ class FrequencyService(object):
         set2data = get_data(set2['district'], set2['list'], bins, start, end)
 
         return {
-            'lastPulled': set1data['lastPulled'],
-            'data': {
-                'bins': set1data['data']['bins'],
-                'set1': {
-                    'district': set1['district'],
-                    'counts': set1data['data']['counts']
-                },
-                'set2': {
-                    'district': set2['district'],
-                    'counts': set2data['data']['counts']
-                }
+            'bins': set1data['bins'],
+            'set1': {
+                'district': set1['district'],
+                'counts': set1data['counts']
+            },
+            'set2': {
+                'district': set2['district'],
+                'counts': set2data['counts']
             }
         }
