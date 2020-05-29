@@ -1,14 +1,10 @@
 import pandas as pd
-from .databaseOrm import Ingest
-from utils.database import db
+import db
+from utils.picklebase import pb
 
 
 class DataService(object):
-    default_table = Ingest.__tablename__
-
-    async def lastPulled(self):
-        rows = db.exec_sql('SELECT last_pulled FROM metadata')
-        return rows.first()[0]
+    default_table = 'requests'
 
     def standardFilters(self,
                         startDate=None,
@@ -18,6 +14,12 @@ class DataService(object):
         '''
         Generates filters for dates, request types, and ncs.
         '''
+        if pb.available():
+            return {
+                'startDate': startDate,
+                'endDate': endDate,
+                'requestTypes': requestTypes,
+                'ncList': ncList}
 
         requestTypes = (', ').join([f"'{rt}'" for rt in requestTypes])
         ncList = (', ').join([str(nc) for nc in ncList])
@@ -37,6 +39,13 @@ class DataService(object):
         '''
         Generates filters for the comparison endpoints.
         '''
+        if pb.available():
+            return {
+                'startDate': startDate,
+                'endDate': endDate,
+                'requestTypes': requestTypes,
+                'ncList': ncList,
+                'cdList': cdList}
 
         requestTypes = (', ').join([f"'{rt}'" for rt in requestTypes])
         if len(ncList) > 0:
@@ -80,25 +89,12 @@ class DataService(object):
         if not fields or not filters:
             return {'Error': 'fields and filters are required'}
 
+        if pb.available():
+            return pb.query(table, fields, filters)
+
         fields = (', ').join(fields)
         return pd.read_sql(f"""
             SELECT {fields}
             FROM {table}
             WHERE {filters}
         """, db.engine)
-
-    def aggregateQuery(self, fields, filters, table=default_table):
-        '''
-        Returns the counts of distinct values in the specified fields,
-        after filtering.
-        '''
-
-        if not fields or not isinstance(fields, list):
-            return {'Error': 'Missing count fields'}
-
-        df = self.query(fields, filters, table)
-
-        return [{
-            'field': field,
-            'counts': df.groupby(by=field).size().to_dict()
-        } for field in fields if field in df.columns]

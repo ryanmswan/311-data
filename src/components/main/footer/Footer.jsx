@@ -20,7 +20,7 @@ const Footer = ({
         <span className="last-updated">
           Data Updated Through:
           &nbsp;
-          {moment(1000 * lastUpdated).format('MMMM Do YYYY, h:mm:ss a')}
+          {moment(lastUpdated).format('MMMM Do YYYY, h:mm:ss a')}
         </span>
       )}
       { version && backendSha && (
@@ -50,7 +50,7 @@ const mapStateToProps = state => ({
 });
 
 Footer.propTypes = {
-  lastUpdated: propTypes.number,
+  lastUpdated: propTypes.string,
   version: propTypes.string,
   backendSha: propTypes.string,
   menuIsOpen: propTypes.bool.isRequired,
